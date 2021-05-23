@@ -1,150 +1,120 @@
 // @TODO: YOUR CODE HERE!
-var svgWidth = 960;
-var svgHeight = 500;
-
-var margin = {
+const svgWidth = 960;
+const svgHeight = 500;
+const margin = {
   top: 20,
   right: 40,
   bottom: 60,
-  left: 100
+  left: 100,
 };
-
-var width = svgWidth - margin.left - margin.right;
-var height = svgHeight - margin.top - margin.bottom;
-
+const width = svgWidth - margin.left - margin.right;
+const height = svgHeight - margin.top - margin.bottom;
 // Create an SVG wrapper, append an SVG group that will hold our chart, and shift the latter by left and top margins.
-var svg = d3.select("body")
-  .append("svg")
-  .attr("width", svgWidth)
-  .attr("height", svgHeight);
-
-var chartGroup = svg.append("g")
-  .attr("transform", `translate(${margin.left}, ${margin.top})`);
-
-d3.select("body").append("div").attr("class", "tooltip").style("opacity", 0);
+let svg = d3
+  .select('#scatter')
+  .append('svg')
+  .attr('width', svgWidth)
+  .attr('height', svgHeight)
+  .append('g')
+  .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
 // Import Data
-d3.csv("data.csv", function(err, healthData) {
-  if (err) throw err;
-console.log(healthData)
-  // Step 1: Parse Data/Cast as numbers
-   // ==============================
-  healthData.forEach(function(data) {
-    data.poverty = +data.poverty;
-    data.healthcare = +data.healthcare;
-  });
+const extractData = (healthData, point) =>
+  healthData.map((data) => parseInt(data[point]));
 
-  // Step 2: Create scale functions
-  // ==============================
-  var xLinearScale = d3.scaleLinear().range([0, width]);
-  var yLinearScale = d3.scaleLinear().range([height, 0]);
+const graphPlot = (xAxis, yAxis, xLabel, yLabel) => {
+  d3.csv('../data/data.csv')
+    .then((healthData) => {
+      // console.log(healthData);
+      // const xAxis = 'healthcare';
+      // const yAxis = 'poverty';
+      const xList = extractData(healthData, xAxis);
+      const xListMax = Math.max.apply(null, xList);
+      // console.log(xList);
+      const yList = extractData(healthData, yAxis);
+      const yListMax = Math.max.apply(null, yList);
 
-  // Step 3: Create axis functions
-  // ==============================
-  var bottomAxis = d3.axisBottom(xLinearScale);
-  var leftAxis = d3.axisLeft(yLinearScale);
+      let x = d3
+        .scaleLinear()
+        .domain([0, xListMax * 1.2])
+        .range([0, width]);
+      svg
+        .append('g')
+        .attr('transform', 'translate(0,' + height + ')')
+        .call(d3.axisBottom(x));
+      let y = d3
+        .scaleLinear()
+        .domain([0, yListMax * 1.2])
+        .range([height, 0]);
+      svg.append('g').call(d3.axisLeft(y));
 
-  var xMin;
-  var xMax;
-  var yMin;
-  var yMax;
-  
-  xMin = d3.min(healthData, function(data) {
-      return data.healthcare;
-  });
-  
-  xMax = d3.max(healthData, function(data) {
-      return data.healthcare;
-  });
-  
-  yMin = d3.min(healthData, function(data) {
-      return data.poverty;
-  });
-  
-  yMax = d3.max(healthData, function(data) {
-      return data.poverty;
-  });
-  
-  xLinearScale.domain([xMin, xMax]);
-  yLinearScale.domain([yMin, yMax]);
-  console.log(xMin);
-  console.log(yMax);
+      var toolTip = d3
+        .tip()
+        .attr('class', 'tooltip')
+        .offset([80, -60])
+        .html(
+          (d) =>
+            `<strong>${d.abbr}</strong><br>${xAxis}: ${d[xAxis]}<br>${yAxis}: ${d[yAxis]}`
+        );
+      svg.call(toolTip);
 
-  // Step 4: Append Axes to the chart
-  // ==============================
-  chartGroup.append("g")
-    .attr("transform", `translate(0, ${height})`)
-    .call(bottomAxis);
+      svg
+        .selectAll('circle')
+        .data(healthData)
+        .enter()
+        .append('circle')
+        .attr('cx', (d) => x(parseInt(d[xAxis])))
+        .attr('cy', (d) => y(parseInt(d[yAxis])))
+        .attr('r', 15)
+        .attr('fill', 'lightblue')
+        .attr('opacity', 0.7)
+        .on('mouseover', function (d) {
+          toolTip.show(d, this);
+        })
+        .on('mouseout', function (d) {
+          toolTip.hide(d);
+        });
 
-  chartGroup.append("g")
-    .call(leftAxis);
+      svg
+        .append('g')
+        .selectAll('text')
+        .data(healthData)
+        .enter()
+        .append('text')
+        .text((d) => d.abbr)
+        .attr('x', (d) => x(parseInt(d[xAxis])))
+        .attr('y', (d) => y(parseInt(d[yAxis])))
+        .attr('text-anchor', 'middle')
+        .attr('stroke', 'black')
+        .attr('stroke-width', 1)
+        .attr('class', 'state_label')
+        .on('mouseover', function (d) {
+          toolTip.show(d, this);
+        })
+        .on('mouseout', function (d) {
+          toolTip.hide(d);
+        });
 
-   // Step 5: Create Circles
-  // ==============================
-  var circlesGroup = chartGroup.selectAll("circle")
-  .data(healthData)
-  .enter()
-  .append("circle")
-  .attr("cx", d => xLinearScale(d.healthcare +1.5))
-  .attr("cy", d => yLinearScale(d.poverty +0.3))
-  .attr("r", "12")
-  .attr("fill", "blue")
-  .attr("opacity", .5)
+      svg
+        .append('text')
+        .attr(
+          'transform',
+          `translate(${margin.left - 140}, ${height * 0.56}) rotate(270)`
+        )
+        .attr('id', yAxis)
+        .attr('class', 'axis_label y_axis_label text')
+        .text(yLabel);
 
-  .on("mouseout", function(data, index) {
-    toolTip.hide(data);
-  });
-  // Step 6: Initialize tool tip
-  // ==============================
-  var toolTip = d3.tip()
-    .attr("class", "tooltip")
-    .offset([80, -60])
-    .html(function(d) {
-      return (abbr + '%');
-      });
-
-  // Step 7: Create tooltip in the chart
-  // ==============================
-  chartGroup.call(toolTip);
-
-  // Step 8: Create event listeners to display and hide the tooltip
-  // ==============================
-  circlesGroup.on("click", function(data) {
-    toolTip.show(data);
-  })
-    // onmouseout event
-    .on("mouseout", function(data, index) {
-      toolTip.hide(data);
-    });
-
-  // Create axes labels
-
-  chartGroup.append("text")
-  .style("font-size", "12px")
-  .selectAll("tspan")
-  .data(healthData)
-  .enter()
-  .append("tspan")
-      .attr("x", function(data) {
-          return xLinearScale(data.healthcare +1.3);
-      })
-      .attr("y", function(data) {
-          return yLinearScale(data.poverty +.1);
-      })
-      .text(function(data) {
-          return data.abbr
-      });
-
-  chartGroup.append("text")
-    .attr("transform", "rotate(-90)")
-    .attr("y", 0 - margin.left + 40)
-    .attr("x", 0 - (height / 2))
-    .attr("dy", "1em")
-    .attr("class", "axisText")
-    .text("Lacks Healtcare(%)");
-
-  chartGroup.append("g")
-    .attr("transform", `translate(${width / 2}, ${height + margin.top + 30})`)
-    .attr("class", "axisText")
-    .text("In Poverty (%)");
-});
+      svg
+        .append('text')
+        .attr(
+          'transform',
+          `translate(${width * 0.45}, ${height + margin.top + 30})`
+        )
+        .attr('id', xAxis)
+        .attr('class', 'axis_label x_axis_label text')
+        .text(xLabel);
+    })
+    .catch((error) => console.log(error));
+};
+graphPlot('healthcare', 'poverty', 'Lacks Healthcare (%)', 'In Poverty (%)');
